@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_file"
+        android:icon="@drawable/whhlegacyfilemanager"
+        android:title="文件管理" />
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@drawable/whhsettingsandroid"
+        android:title="设置" />
+
+</menu>

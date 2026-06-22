@@ -1,54 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:background="#F8F9FA">
 
-    <TextView
-        android:id="@+id/tvStatus"
+    <!-- 顶部标题栏：高度自适应，保证加状态栏边距后内容不被挤压 -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="正在检测..."
-        android:textSize="16sp"
-        android:layout_marginBottom="12dp"/>
+        android:minHeight="?attr/actionBarSize"
+        android:background="@color/white"
+        android:elevation="2dp"
+        app:titleTextColor="#1F2937"
+        app:title="ShizuBridge" />
 
-    <Button
-        android:id="@+id/btnRequestPermission"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="申请Shizuku权限"
-        android:layout_marginBottom="12dp"/>
-
-    <Button
-        android:id="@+id/btnTestCommand"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="测试：列出目标目录"
-        android:enabled="false"
-        android:layout_marginBottom="12dp"/>
-
-    <Button
-        android:id="@+id/btnImportFile"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="导入文件到 /data/local/tmp/ShizuBridge"
-        android:enabled="false"
-        android:layout_marginBottom="12dp"/>
-
-    <ScrollView
+    <!-- 内容容器 -->
+    <FrameLayout
+        android:id="@+id/fragment_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="#F5F5F5"
-        android:padding="8dp">
+        android:layout_weight="1" />
 
-        <TextView
-            android:id="@+id/tvResult"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:textSize="13sp"
-            android:text="结果显示区" />
-    </ScrollView>
+    <!-- 底部分割线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="#E5E7EB" />
+
+    <!-- 底部导航栏 -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemTextColor="@color/bottom_nav_color"
+        app:menu="@menu/bottom_nav_menu" />
+
 </LinearLayout>
