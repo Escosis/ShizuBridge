@@ -5,6 +5,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import com.escosis.shizubridge.IShellService
 import com.escosis.shizubridge.ShellUserService
+import com.escosis.shizubridge.data.CommandResult
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -12,33 +13,16 @@ object ShellExecutor {
 
     private var shellService: IShellService? = null
 
-    /**
-     * 执行Shell命令，首次调用自动绑定服务
-     */
-    suspend fun exec(command: String): String = suspendCancellableCoroutine { cont ->
-        if (!ShizukuManager.hasPermission()) {
-            cont.resume("错误: 未获得Shizuku权限")
+    private suspend fun ensureService(): Boolean = suspendCancellableCoroutine { cont ->
+        shellService?.let {
+            cont.resume(true)
             return@suspendCancellableCoroutine
         }
 
-        // 服务已绑定，直接执行
-        shellService?.let { service ->
-            cont.resume(
-                runCatching { service.execCommand(command) }
-                    .getOrElse { "执行异常: ${it.message ?: it.javaClass.simpleName}" }
-            )
-            return@suspendCancellableCoroutine
-        }
-
-        // 首次调用，绑定服务
         ShellUserService.bind(object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                val binder = IShellService.Stub.asInterface(service)
-                shellService = binder
-                cont.resume(
-                    runCatching { binder.execCommand(command) }
-                        .getOrElse { "执行异常: ${it.message ?: it.javaClass.simpleName}" }
-                )
+                shellService = IShellService.Stub.asInterface(service)
+                cont.resume(true)
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -48,8 +32,25 @@ object ShellExecutor {
     }
 
     /**
-     * 释放服务连接
+     * 执行Shell命令，返回结构化结果
      */
+    suspend fun exec(command: String): CommandResult {
+        if (!ShizukuManager.hasPermission()) {
+            return CommandResult(-1, "", "未获得Shizuku权限")
+        }
+        if (!ensureService()) {
+            return CommandResult(-1, "", "服务绑定失败")
+        }
+        return runCatching {
+            val result = shellService!!.exec(command)
+            val exitCode = result.getOrNull(0)?.toIntOrNull() ?: -1
+            CommandResult(exitCode, result.getOrNull(1) ?: "", result.getOrNull(2) ?: "")
+        }.getOrElse {
+            shellService = null
+            CommandResult(-1, "", "服务异常: ${it.message ?: it.javaClass.simpleName}")
+        }
+    }
+
     fun release() {
         runCatching { shellService?.destroy() }
         shellService = null

@@ -9,18 +9,15 @@ import java.io.InputStreamReader
 
 class ShellUserService : IShellService.Stub() {
 
-    override fun execCommand(command: String): String {
+    override fun exec(command: String): Array<String> {
         return runCatching {
             val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
-            val stdout = BufferedReader(InputStreamReader(process.inputStream)).readText()
-            val stderr = BufferedReader(InputStreamReader(process.errorStream)).readText()
-            process.waitFor()
-            buildString {
-                append(stdout.trim())
-                if (stderr.isNotBlank()) append("\n[stderr] $stderr")
-            }
+            val stdout = BufferedReader(InputStreamReader(process.inputStream)).readText().trim()
+            val stderr = BufferedReader(InputStreamReader(process.errorStream)).readText().trim()
+            val exitCode = process.waitFor().toString()
+            arrayOf(exitCode, stdout, stderr)
         }.getOrElse {
-            "执行异常: ${it.message ?: it.javaClass.simpleName}"
+            arrayOf("-1", "", "执行异常: ${it.message ?: it.javaClass.simpleName}")
         }
     }
 
@@ -29,10 +26,6 @@ class ShellUserService : IShellService.Stub() {
     }
 
     companion object {
-        /**
-         * 绑定远程用户服务
-         * @param connection 系统原生 ServiceConnection 回调
-         */
         fun bind(connection: ServiceConnection) {
             val serviceArgs = Shizuku.UserServiceArgs(
                 ComponentName(
@@ -41,7 +34,7 @@ class ShellUserService : IShellService.Stub() {
                 )
             )
                 .processNameSuffix("shell_service")
-                .version(1)
+                .version(5) // 版本号+1，强制重建干净的服务进程
                 .daemon(false)
             Shizuku.bindUserService(serviceArgs, connection)
         }

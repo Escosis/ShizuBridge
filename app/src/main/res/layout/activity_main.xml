@@ -24,7 +24,15 @@
         android:id="@+id/btnTestCommand"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="测试：列出/data/local/tmp"
+        android:text="测试：列出目标目录"
+        android:enabled="false"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnImportFile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="导入文件到 /data/local/tmp/ShizuBridge"
         android:enabled="false"
         android:layout_marginBottom="12dp"/>
 
