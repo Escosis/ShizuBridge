@@ -37,6 +37,8 @@ class FileListFragment : Fragment() {
     private var retryJob: Job? = null
     private var timerJob: Job? = null
     private var hasRetried = false
+    // Base64分块大小：原始数据32KB，编码后约43KB，平衡效率与命令长度安全性
+    private val TRANSFER_CHUNK_SIZE = 32 * 1024
 
     private val permissionListener: (Boolean) -> Unit = { }
 
@@ -186,82 +188,124 @@ class FileListFragment : Fragment() {
     }
 
     // ========== 以下导入/导出逻辑保持不变 ==========
+// ========== 导入：Base64分块传输，无中转文件 ==========
     private fun startImport(uris: List<Uri>) {
         Toast.makeText(requireContext(), "开始导入 ${uris.size} 个文件", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             var successCount = 0
+            // 确保目标目录存在
             ShellExecutor.exec("mkdir -p $currentPath")
 
             withContext(Dispatchers.IO) {
                 uris.forEach { uri ->
                     val fileName = getFileName(uri) ?: return@forEach
-                    val success = importSingleFile(uri, fileName)
-                    if (success) successCount++
+                    val success = importSingleFile(uri, "$currentPath/$fileName")
+                    if (success) {
+                        // 设置777全局权限
+                        ShellExecutor.exec("chmod 777 \"$currentPath/$fileName\"")
+                        successCount++
+                    }
                 }
             }
 
-            ImportHelper.clearTempCache(requireContext())
             Toast.makeText(requireContext(), "导入完成：成功 $successCount 个", Toast.LENGTH_SHORT).show()
             loadFileList()
         }
     }
 
-    private suspend fun importSingleFile(uri: Uri, fileName: String): Boolean {
-        return try {
-            val tempPath = ImportHelper.copyUriToPublicCache(requireContext(), uri, fileName)
-            val targetPath = "$currentPath/$fileName"
-            val copyResult = ShellExecutor.exec("cp \"$tempPath\" \"$targetPath\"")
-            val chmodResult = ShellExecutor.exec("chmod 777 \"$targetPath\"")
-            copyResult.isSuccess && chmodResult.isSuccess
-        } catch (e: Exception) {
-            false
-        } finally {
-            runCatching {
-                val tempFile = File(requireContext().getExternalFilesDir(null), "import_temp/$fileName")
-                if (tempFile.exists()) tempFile.delete()
+    /**
+     * 单文件导入：Base64分块写入，无中转文件，兼容多用户隔离
+     */
+    private suspend fun importSingleFile(uri: Uri, targetPath: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            var inputStream: java.io.InputStream? = null
+            try {
+                inputStream = requireContext().contentResolver.openInputStream(uri)
+                    ?: return@withContext false
+                val buffer = ByteArray(TRANSFER_CHUNK_SIZE)
+                var isFirstChunk = true
+                var readLen: Int
+
+                while (inputStream.read(buffer).also { readLen = it } != -1) {
+                    // 截取实际读取的字节，转无换行Base64
+                    val chunk = buffer.copyOf(readLen)
+                    val base64Str = android.util.Base64.encodeToString(chunk, android.util.Base64.NO_WRAP)
+
+                    // 第一块覆盖写入，后续块追加写入
+                    val redirect = if (isFirstChunk) ">" else ">>"
+                    // 单引号包裹Base64串，避免Shell特殊字符解析问题
+                    val cmd = "printf '%s' '$base64Str' | base64 -d $redirect \"$targetPath\""
+                    val result = ShellExecutor.exec(cmd)
+
+                    if (!result.isSuccess) {
+                        return@withContext false
+                    }
+                    isFirstChunk = false
+                }
+                true
+            } catch (e: Exception) {
+                false
+            } finally {
+                runCatching { inputStream?.close() }
             }
         }
     }
 
+    // ========== 导出：Base64分块读取，无中转文件 ==========
     private fun startExport(fileItem: FileItem, targetUri: Uri) {
         Toast.makeText(requireContext(), "正在导出：${fileItem.name}", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             val success = exportSingleFile(fileItem.path, targetUri)
-            if (success) {
-                Toast.makeText(requireContext(), "导出成功", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(requireContext(), "导出失败", Toast.LENGTH_SHORT).show()
-            }
-            ImportHelper.clearTempCache(requireContext())
+            Toast.makeText(
+                requireContext(),
+                if (success) "导出成功" else "导出失败",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
+    /**
+     * 单文件导出：dd按偏移分块 + Base64编码，无中转文件，兼容多用户隔离
+     */
     private suspend fun exportSingleFile(sourcePath: String, targetUri: Uri): Boolean {
         return withContext(Dispatchers.IO) {
-            var tempPath: String? = null
+            var outputStream: java.io.OutputStream? = null
             try {
-                val fileName = sourcePath.substringAfterLast("/")
-                val tempFile = File(requireContext().getExternalFilesDir(null), "import_temp/$fileName")
-                tempPath = tempFile.absolutePath
-                tempFile.parentFile?.mkdirs()
-
-                val copyResult = ShellExecutor.exec("cp \"$sourcePath\" \"$tempPath\"")
-                if (!copyResult.isSuccess) return@withContext false
-
-                val inputStream = FileInputStream(tempFile)
-                val outputStream = requireContext().contentResolver.openOutputStream(targetUri)
+                outputStream = requireContext().contentResolver.openOutputStream(targetUri)
                     ?: return@withContext false
+                var offset = 0L
 
-                inputStream.use { input ->
-                    outputStream.use { output ->
-                        input.copyTo(output, bufferSize = 8 * 1024 * 1024)
+                while (true) {
+                    // dd按字节偏移读取指定大小块，管道给base64编码，丢弃stderr避免统计信息干扰
+                    val cmd = "dd if=\"$sourcePath\" bs=1 count=$TRANSFER_CHUNK_SIZE skip=$offset 2>/dev/null | base64"
+                    val result = ShellExecutor.exec(cmd)
+
+                    if (!result.isSuccess || result.stdout.isBlank()) {
+                        break
+                    }
+
+                    // 去掉末尾换行，解码Base64
+                    val base64Str = result.stdout.trim()
+                    val chunk = try {
+                        android.util.Base64.decode(base64Str, android.util.Base64.DEFAULT)
+                    } catch (e: Exception) {
+                        return@withContext false
+                    }
+
+                    outputStream.write(chunk)
+                    offset += chunk.size
+
+                    // 读到文件末尾，退出循环
+                    if (chunk.size < TRANSFER_CHUNK_SIZE) {
+                        break
                     }
                 }
                 true
             } catch (e: Exception) {
                 false
             } finally {
-                tempPath?.let { runCatching { File(it).delete() } }
+                runCatching { outputStream?.flush() }
+                runCatching { outputStream?.close() }
             }
         }
     }
