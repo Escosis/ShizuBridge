@@ -3,25 +3,21 @@ package com.escosis.shizubridge.utils
 import android.content.ComponentName
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.os.ParcelFileDescriptor
 import com.escosis.shizubridge.IShellService
 import com.escosis.shizubridge.ShellUserService
 import com.escosis.shizubridge.data.CommandResult
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 
 object ShellExecutor {
 
-    // 全程超时：绑定服务+执行命令总计3秒
-    private const val TOTAL_TIMEOUT_MS = 1000L
+    private const val TOTAL_TIMEOUT_MS = 3000L // 连接/操作超时
     private var shellService: IShellService? = null
 
-    /**
-     * 绑定服务，带取消处理，不会挂死
-     */
     private suspend fun ensureService(): Boolean = suspendCancellableCoroutine { cont ->
-        // 已有连接直接返回
         shellService?.let {
             cont.resume(true)
             return@suspendCancellableCoroutine
@@ -30,9 +26,7 @@ object ShellExecutor {
         val connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 shellService = IShellService.Stub.asInterface(service)
-                if (cont.isActive) {
-                    cont.resume(true)
-                }
+                if (cont.isActive) cont.resume(true)
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -40,56 +34,66 @@ object ShellExecutor {
             }
         }
 
-        // 协程取消时直接返回失败，避免永久挂起
         cont.invokeOnCancellation {
-            if (cont.isActive) {
-                cont.resume(false)
-            }
+            if (cont.isActive) cont.resume(false)
         }
 
-        // 发起绑定，失败立即返回
         runCatching {
             ShellUserService.bind(connection)
         }.getOrElse {
-            if (cont.isActive) {
-                cont.resume(false)
-            }
+            if (cont.isActive) cont.resume(false)
         }
     }
 
-    /**
-     * 执行Shell命令，全程3秒超时，超时必返回
-     * 退出码：0成功 / -1通用错误 / -2连接超时
-     */
+    // 执行Shell命令（保留）
     suspend fun exec(command: String): CommandResult {
         if (!ShizukuManager.hasPermission()) {
             return CommandResult(-1, "", "未获得Shizuku权限")
         }
-
         return try {
-            // 绑定服务+执行命令 全程纳入超时
             withTimeout(TOTAL_TIMEOUT_MS) {
-                if (!ensureService()) {
-                    return@withTimeout CommandResult(-1, "", "服务绑定失败")
-                }
+                if (!ensureService()) return@withTimeout CommandResult(-1, "", "服务绑定失败")
                 val result = shellService!!.exec(command)
                 val exitCode = result.getOrNull(0)?.toIntOrNull() ?: -1
                 CommandResult(exitCode, result.getOrNull(1) ?: "", result.getOrNull(2) ?: "")
             }
         } catch (e: TimeoutCancellationException) {
-            // 超时：强制重置所有连接
             resetConnection()
-            CommandResult(-2, "", "Shizuku连接超时，请重新授权")
+            CommandResult(-2, "", "Shizuku连接超时")
         } catch (e: Exception) {
-            // 所有异常都重置连接
             resetConnection()
-            CommandResult(-1, "", "服务异常: ${e.message ?: e.javaClass.simpleName}")
+            CommandResult(-1, "", "服务异常: ${e.message}")
         }
     }
 
-    /**
-     * 强制重置连接，下次执行重新绑定
-     */
+    // 打开远程文件只读，返回ParcelFileDescriptor
+    suspend fun openFileRead(path: String): ParcelFileDescriptor? {
+        if (!ShizukuManager.hasPermission()) return null
+        return try {
+            withTimeout(TOTAL_TIMEOUT_MS) {
+                if (!ensureService()) return@withTimeout null
+                shellService!!.openFileRead(path)
+            }
+        } catch (e: Exception) {
+            resetConnection()
+            null
+        }
+    }
+
+    // 打开远程文件写入，返回ParcelFileDescriptor
+    suspend fun openFileWrite(path: String, append: Boolean = false): ParcelFileDescriptor? {
+        if (!ShizukuManager.hasPermission()) return null
+        return try {
+            withTimeout(TOTAL_TIMEOUT_MS) {
+                if (!ensureService()) return@withTimeout null
+                shellService!!.openFileWrite(path, append)
+            }
+        } catch (e: Exception) {
+            resetConnection()
+            null
+        }
+    }
+
     fun resetConnection() {
         runCatching { shellService?.destroy() }
         shellService = null

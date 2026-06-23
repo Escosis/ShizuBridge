@@ -13,6 +13,7 @@ import com.escosis.shizubridge.utils.ShizukuManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.escosis.shizubridge.R
 
 class HomeFragment : Fragment() {
 
@@ -29,7 +30,7 @@ class HomeFragment : Fragment() {
         refreshStatus()
         Toast.makeText(
             requireContext(),
-            if (granted) "授权成功，等待服务就绪后可正常使用" else "授权被拒绝",
+            if (granted) R.string.permission_granted else R.string.permission_rejected,
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -82,13 +83,9 @@ class HomeFragment : Fragment() {
             val intent = requireContext().packageManager.getLaunchIntentForPackage(shizukuPkg)
             if (intent != null) {
                 startActivity(intent)
-                Toast.makeText(
-                    requireContext(),
-                    "在Shizuku授权管理中关闭本应用权限后重新授权，可跳过30秒等待",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(requireContext(), getString(R.string.toast_authorize_success), Toast.LENGTH_LONG).show()
             } else {
-                Toast.makeText(requireContext(), "未安装Shizuku应用", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), R.string.shizuku_not_running, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -98,9 +95,9 @@ class HomeFragment : Fragment() {
         val granted = ShizukuManager.hasPermission()
 
         binding.tvStatus.text = when {
-            !available -> "❌ Shizuku 服务未运行"
-            !granted -> "⚠️ 服务已连接，尚未授权"
-            else -> "✅ 服务正常，已获得权限"
+            !available -> getString(R.string.status_not_running)
+            !granted -> getString(R.string.status_connected_no_perm)
+            else -> getString(R.string.status_ready)
         }
 
         binding.btnRequestPermission.isEnabled = available && !granted
@@ -114,20 +111,20 @@ class HomeFragment : Fragment() {
      */
     private fun testListTargetDir() {
         val targetDir = "/data/local/tmp/ShizuBridge"
-        binding.tvResult.text = "正在执行命令... 已等待 0 秒"
+        binding.tvResult.text = "${getString(R.string.result_loading, 0)}"
 
         // 启动秒级计时器（与命令并行）
         var elapsed = 0
-        timerJob = lifecycleScope.launch {
-            while (true) {
+        timerJob = viewLifecycleOwner.lifecycleScope.launch {
+        while (true) {
                 delay(1000)
                 elapsed++
-                binding.tvResult.text = "正在执行命令... 已等待 $elapsed 秒"
+                binding.tvResult.text = getString(R.string.result_loading, elapsed)
             }
         }
 
-        lifecycleScope.launch {
-            val result = ShellExecutor.exec("mkdir -p $targetDir && ls -la $targetDir")
+        viewLifecycleOwner.lifecycleScope.launch {
+        val result = ShellExecutor.exec("mkdir -p $targetDir && ls -la $targetDir")
             timerJob?.cancel() // 命令返回立刻停止计时
 
             when {
@@ -136,18 +133,18 @@ class HomeFragment : Fragment() {
                         hasRetried = true
                         startRetryCountdown(targetDir)
                     } else {
-                        binding.tvResult.text = "❌ 30秒后仍未连接成功\n\n请打开Shizuku关闭权限重新授权"
+                        binding.tvResult.text = getString(R.string.result_timeout)
                     }
                 }
                 result.isSuccess -> {
                     hasRetried = false
                     retryJob?.cancel()
-                    binding.tvResult.text = "目标目录 $targetDir 内容：\n\n${result.stdout.ifEmpty { "(目录为空)" }}"
+                    binding.tvResult.text = getString(R.string.result_command_success, targetDir, result.stdout.ifEmpty { "(empty)" })
                 }
                 else -> {
                     hasRetried = false
                     retryJob?.cancel()
-                    binding.tvResult.text = "执行失败\n错误信息: ${result.stderr}"
+                    binding.tvResult.text = getString(R.string.result_command_failed, result.stderr)
                 }
             }
         }
@@ -158,13 +155,13 @@ class HomeFragment : Fragment() {
      */
     private fun startRetryCountdown(targetDir: String) {
         var remainSeconds = 30
-        binding.tvResult.text = "⚠️ 服务连接未就绪，30秒后自动重试（剩余 $remainSeconds 秒）\n\n可打开Shizuku关闭权限重新授权以跳过等待"
+        binding.tvResult.text = getString(R.string.result_retry, remainSeconds)
 
-        retryJob = lifecycleScope.launch {
-            while (remainSeconds > 0) {
+        retryJob = viewLifecycleOwner.lifecycleScope.launch {
+        while (remainSeconds > 0) {
                 delay(1000)
                 remainSeconds--
-                binding.tvResult.text = "⚠️ 服务连接未就绪，30秒后自动重试（剩余 $remainSeconds 秒）\n\n可打开Shizuku关闭权限重新授权以跳过等待"
+                binding.tvResult.text = getString(R.string.result_retry, remainSeconds)
             }
             testListTargetDir()
         }

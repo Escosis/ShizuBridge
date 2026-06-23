@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="#2563EB" android:state_checked="true" />
-    <item android:color="#9CA3AF" android:state_checked="false" />
+    <!-- 选中状态：使用主题色（蓝色） -->
+    <item android:state_checked="true" android:color="?attr/colorPrimary" />
+    <!-- 未选中状态：使用次要文字颜色（灰色） -->
+    <item android:color="?attr/colorOnSurfaceVariant" />
 </selector>

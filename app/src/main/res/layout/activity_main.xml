@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F8F9FA">
+    android:background="?attr/colorSurface">
 
     <!-- 顶部标题栏：高度自适应，保证加状态栏边距后内容不被挤压 -->
     <androidx.appcompat.widget.Toolbar
@@ -12,9 +12,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="?attr/actionBarSize"
-        android:background="@color/white"
+        android:background="?attr/colorSurface"
         android:elevation="2dp"
-        app:titleTextColor="#1F2937"
+        app:titleTextColor="?attr/colorOnSurface"
         app:title="ShizuBridge" />
 
     <!-- 内容容器 -->
@@ -28,14 +28,14 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="0.5dp"
-        android:background="#E5E7EB" />
+        android:background="?attr/colorOutline" />
 
     <!-- 底部导航栏 -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/white"
+        android:background="?attr/colorSurface"
         app:itemIconTint="@color/bottom_nav_color"
         app:itemTextColor="@color/bottom_nav_color"
         app:menu="@menu/bottom_nav_menu" />

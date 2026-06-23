@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- 基础颜色（浅色） -->
+    <color name="color_primary">#2563EB</color>
+    <color name="color_on_primary">#FFFFFF</color>
+    <color name="color_surface">#F8F9FA</color>
+    <color name="color_on_surface">#1F2937</color>
+    <color name="color_on_surface_variant">#6B7280</color>
+    <color name="color_surface_variant">#E5E7EB</color>
+    <color name="color_outline">#9CA3AF</color>
+
+    <!-- 别名（便于布局和代码中引用） -->
+    <color name="text_primary">@color/color_on_surface</color>
+    <color name="text_secondary">@color/color_on_surface_variant</color>
+    <color name="background">@color/color_surface</color>
+    <color name="surface">@color/color_surface</color>
+    <color name="surface_variant">@color/color_surface_variant</color>
+    <color name="icon_color">@color/color_on_surface_variant</color>
+    <color name="divider">@color/color_outline</color>
 </resources>

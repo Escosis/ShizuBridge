@@ -1,3 +1,73 @@
 <resources>
+    <!-- 应用名 -->
     <string name="app_name">ShizuBridge</string>
+
+    <!-- 导航栏标题 -->
+    <string name="title_home">ShizuBridge</string>
+    <string name="title_file">File Manager</string>
+    <string name="title_settings">Settings</string>
+
+    <!-- 底部导航 -->
+    <string name="nav_home">Home</string>
+    <string name="nav_file">Files</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- 设置 - 主题 -->
+    <string name="theme_mode">Theme</string>
+    <string name="theme_follow_system">Follow System</string>
+    <string name="theme_light">Light Mode</string>
+    <string name="theme_dark">Dark Mode</string>
+
+    <!-- 设置 - 语言 -->
+    <string name="language">Language</string>
+    <string name="language_follow_system">Follow System</string>
+    <string name="language_chinese">中文（简体）</string>
+    <string name="language_english">English</string>
+
+    <!-- Home 页面 -->
+    <string name="status_service">Service Status</string>
+    <string name="status_detecting">Detecting…</string>
+    <string name="status_not_running">❌ Shizuku service is not running</string>
+    <string name="status_connected_no_perm">⚠️ Service connected, but not authorized</string>
+    <string name="status_ready">✅ Service ready, permission granted</string>
+    <string name="status_note">Note: It takes about 30 seconds to connect after app start. You can reopen Shizuku and re-authorize to skip waiting.</string>
+    <string name="btn_request_permission">Request Shizuku Permission</string>
+    <string name="btn_test_command">Test: List Target Directory</string>
+    <string name="btn_open_shizuku">Open Shizuku to Manage Permissions</string>
+    <string name="result_title">Result</string>
+    <string name="result_waiting">Waiting for execution…</string>
+    <string name="result_loading">Executing… %d seconds elapsed</string>
+    <string name="result_retry">Service not ready, retrying in %d seconds…\nYou can revoke and re-grant permission in Shizuku to skip waiting</string>
+    <string name="result_timeout">Connection timeout after 30 seconds.\nPlease revoke and re-grant permission in Shizuku</string>
+    <string name="result_command_failed">Execution failed\nError: %s</string>
+    <string name="result_command_success">Directory %s contents:\n\n%s</string>
+
+    <!-- 文件管理 -->
+    <string name="empty_loading">Loading…</string>
+    <string name="empty_no_permission">Please request Shizuku permission first</string>
+    <string name="empty_directory_empty">Directory is empty. Click + to import files</string>
+    <string name="delete_confirm_title">Confirm Delete</string>
+    <string name="delete_confirm_message">Are you sure you want to delete "%s"? This cannot be undone!</string>
+    <string name="delete_positive">Delete</string>
+    <string name="delete_negative">Cancel</string>
+    <string name="delete_success">Deleted successfully</string>
+    <string name="delete_failed">Delete failed: %s</string>
+    <string name="import_start">Starting import of %d file(s)</string>
+    <string name="import_complete">Import complete: %d successful</string>
+    <string name="export_start">Exporting: %s</string>
+    <string name="export_success">Export successful</string>
+    <string name="export_failed">Export failed</string>
+
+    <!-- 通用 Toast -->
+    <string name="shizuku_not_running">Shizuku is not running</string>
+    <string name="permission_denied">Permission denied</string>
+    <string name="permission_granted">Permission granted</string>
+    <string name="permission_rejected">Permission rejected</string>
+    <string name="toast_authorize_success">Authorization succeeded, waiting for service ready</string>
+
+    <string name="about">About</string>
+    <string name="about_description">A tool for cross-user file transfer via Shizuku</string>
+    <string name="version">Version</string>
+    <string name="github_repo">GitHub Repository</string>
+    <string name="open_github_failed">Failed to open GitHub page</string>
 </resources>

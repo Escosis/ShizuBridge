@@ -1,7 +1,9 @@
 package com.escosis.shizubridge.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -14,6 +16,7 @@ class FileListAdapter : ListAdapter<FileItem, FileListAdapter.ViewHolder>(DiffCa
 
     // 导出按钮点击回调
     var onExportClick: ((FileItem) -> Unit)? = null
+    var onDeleteClick: ((FileItem) -> Unit)? = null
 
     inner class ViewHolder(private val binding: ItemFileBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: FileItem) {
@@ -23,20 +26,26 @@ class FileListAdapter : ListAdapter<FileItem, FileListAdapter.ViewHolder>(DiffCa
             val sizeText = if (item.isDirectory) "" else formatSize(item.size) + "  ·  "
             binding.tvFileInfo.text = "$sizeText${item.permission}  ·  ${item.modifyTime}"
 
+            val iconColor = ContextCompat.getColor(binding.root.context, R.color.icon_color)
             // 区分文件/文件夹图标与颜色
             if (item.isDirectory) {
-                binding.ivIcon.setImageResource(android.R.drawable.ic_menu_myplaces)
-                binding.ivIcon.setColorFilter(0xFF2563EB.toInt())
-                binding.btnExport.visibility = android.view.View.GONE // 文件夹暂不支持导出
+                binding.ivIcon.setImageResource(R.drawable.baseline_folder_24)
+                binding.ivIcon.setColorFilter(iconColor)
+                binding.btnExport.visibility = View.GONE
+                binding.btnDelete.visibility = View.VISIBLE
             } else {
-                binding.ivIcon.setImageResource(android.R.drawable.ic_menu_save)
-                binding.ivIcon.setColorFilter(0xFF6B7280.toInt())
-                binding.btnExport.visibility = android.view.View.VISIBLE
+                binding.ivIcon.setImageResource(R.drawable.baseline_insert_drive_file_24)
+                binding.ivIcon.setColorFilter(iconColor)
+                binding.btnExport.visibility = View.VISIBLE
+                binding.btnDelete.visibility = View.VISIBLE
             }
 
             // 导出按钮点击事件
             binding.btnExport.setOnClickListener {
                 onExportClick?.invoke(item)
+            }
+            binding.btnDelete.setOnClickListener {
+                onDeleteClick?.invoke(item)
             }
         }
 

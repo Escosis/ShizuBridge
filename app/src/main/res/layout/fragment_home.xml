@@ -18,7 +18,7 @@
             android:layout_marginBottom="16dp"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#EFF6FF">
+            app:cardBackgroundColor="?attr/colorSurfaceVariant">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -29,51 +29,61 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="服务状态"
+                    android:text="@string/status_service"
                     android:textSize="14sp"
-                    android:textColor="#64748B"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginBottom="8dp"/>
 
                 <TextView
                     android:id="@+id/tvStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="正在检测..."
+                    android:text="@string/status_detecting"
                     android:textSize="16sp"
-                    android:textColor="#1E40AF"
+                    android:textColor="?attr/colorOnSurface"
                     android:fontFamily="sans-serif-medium"/>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="注：应用启动后约30秒连接才会就绪，可打开Shizuku关闭权限重新授权以跳过等待"
+                    android:text="@string/status_note"
                     android:textSize="12sp"
-                    android:textColor="#64748B"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:layout_marginTop="8dp"/>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- 操作按钮区 -->
+        <!-- 按钮 -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRequestPermission"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:text="申请 Shizuku 权限"
+            android:text="@string/btn_request_permission"
             android:textSize="15sp"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="12sp"
+            android:autoSizeMaxTextSize="15sp"
+            android:paddingVertical="12dp"
             android:layout_marginBottom="12dp"
+            android:textColor="@color/button_text_color"
             app:cornerRadius="12dp"
-            app:backgroundTint="#2563EB"
+            app:backgroundTint="@color/button_tint"
             android:enabled="false"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTestCommand"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:text="测试：列出目标目录"
+            android:text="@string/btn_test_command"
             android:textSize="15sp"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="12sp"
+            android:autoSizeMaxTextSize="15sp"
+            android:paddingVertical="12dp"
             android:layout_marginBottom="12dp"
+            android:textColor="@color/button_text_color"
             app:cornerRadius="12dp"
-            app:backgroundTint="#10B981"
+            app:backgroundTint="@color/button_tint"
             android:enabled="false"/>
 
         <com.google.android.material.button.MaterialButton
@@ -81,20 +91,24 @@
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:text="打开 Shizuku 管理权限"
+            android:text="@string/btn_open_shizuku"
             android:textSize="15sp"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="8sp"
+            android:autoSizeMaxTextSize="15sp"
+            android:paddingVertical="12dp"
             android:layout_marginBottom="20dp"
             app:cornerRadius="12dp"
-            app:strokeColor="#2563EB"
-            android:textColor="#2563EB"/>
+            app:strokeColor="?attr/colorPrimary"
+            android:textColor="?attr/colorPrimary"/>
 
-        <!-- 结果展示区 -->
+        <!-- 结果区 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="执行结果"
+            android:text="@string/result_title"
             android:textSize="14sp"
-            android:textColor="#64748B"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:layout_marginBottom="8dp"/>
 
         <androidx.cardview.widget.CardView
@@ -103,7 +117,7 @@
             android:layout_weight="1"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#F3F4F6">
+            app:cardBackgroundColor="?attr/colorSurfaceVariant">
 
             <ScrollView
                 android:layout_width="match_parent"
@@ -116,8 +130,8 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:textSize="13sp"
-                    android:textColor="#374151"
-                    android:text="等待执行..."/>
+                    android:textColor="?attr/colorOnSurface"
+                    android:text="@string/result_waiting"/>
             </ScrollView>
         </androidx.cardview.widget.CardView>
 

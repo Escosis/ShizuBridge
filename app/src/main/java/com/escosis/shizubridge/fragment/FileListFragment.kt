@@ -2,6 +2,7 @@ package com.escosis.shizubridge.fragment
 
 import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -24,6 +25,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
+import androidx.appcompat.app.AlertDialog
+import com.escosis.shizubridge.R
 
 class FileListFragment : Fragment() {
 
@@ -37,8 +40,6 @@ class FileListFragment : Fragment() {
     private var retryJob: Job? = null
     private var timerJob: Job? = null
     private var hasRetried = false
-    // Base64分块大小：原始数据32KB，编码后约43KB，平衡效率与命令长度安全性
-    private val TRANSFER_CHUNK_SIZE = 32 * 1024
 
     private val permissionListener: (Boolean) -> Unit = { }
 
@@ -83,7 +84,7 @@ class FileListFragment : Fragment() {
 
         binding.btnImport.setOnClickListener {
             if (!ShizukuManager.hasPermission()) {
-                Toast.makeText(requireContext(), "请先在首页申请权限", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.empty_no_permission), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             importLauncher.launch(arrayOf("*/*"))
@@ -109,6 +110,9 @@ class FileListFragment : Fragment() {
             pendingExportFile = fileItem
             exportLauncher.launch(fileItem.name)
         }
+        adapter.onDeleteClick = { fileItem ->
+            showDeleteConfirmationDialog(fileItem)
+        }
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
     }
@@ -120,7 +124,7 @@ class FileListFragment : Fragment() {
      */
     private fun loadFileList() {
         if (!ShizukuManager.hasPermission()) {
-            binding.tvEmpty.text = "请先在首页申请 Shizuku 权限"
+            binding.tvEmpty.text = getString(R.string.empty_loading)
             adapter.submitList(emptyList())
             return
         }
@@ -130,15 +134,15 @@ class FileListFragment : Fragment() {
 
         // 启动秒级计时器
         var elapsed = 0
-        timerJob = lifecycleScope.launch {
-            while (true) {
+        timerJob = viewLifecycleOwner.lifecycleScope.launch {
+        while (true) {
                 delay(1000)
                 elapsed++
-                binding.tvEmpty.text = "加载中... 已等待 $elapsed 秒"
+                binding.tvEmpty.text = getString(R.string.result_loading, elapsed)
             }
         }
 
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val result = ShellExecutor.exec("mkdir -p $currentPath && ls -la $currentPath")
             timerJob?.cancel() // 结果返回立刻停止计时
 
@@ -148,7 +152,7 @@ class FileListFragment : Fragment() {
                         hasRetried = true
                         startRetryCountdown()
                     } else {
-                        binding.tvEmpty.text = "连接超时，30秒后仍未就绪\n请打开Shizuku关闭权限重新授权"
+                        binding.tvEmpty.text = getString(R.string.result_timeout)
                         adapter.submitList(emptyList())
                     }
                 }
@@ -158,12 +162,12 @@ class FileListFragment : Fragment() {
                     val fileList = FileParser.parseLsOutput(currentPath, result.stdout)
                     adapter.submitList(fileList)
                     binding.tvEmpty.visibility = if (fileList.isEmpty()) View.VISIBLE else View.GONE
-                    binding.tvEmpty.text = "目录为空，点击右上角导入文件"
+                    binding.tvEmpty.text = getString(R.string.empty_directory_empty)
                 }
                 else -> {
                     hasRetried = false
                     retryJob?.cancel()
-                    binding.tvEmpty.text = "加载失败：${result.stderr}"
+                    binding.tvEmpty.text = getString(R.string.result_command_failed, result.stderr)
                     adapter.submitList(emptyList())
                 }
             }
@@ -175,24 +179,22 @@ class FileListFragment : Fragment() {
      */
     private fun startRetryCountdown() {
         var remainSeconds = 30
-        binding.tvEmpty.text = "服务连接未就绪，30秒后自动重试（剩余 $remainSeconds 秒）\n可打开Shizuku关闭权限重新授权以跳过等待"
+        binding.tvEmpty.text = getString(R.string.result_retry, remainSeconds)
 
-        retryJob = lifecycleScope.launch {
+        retryJob = viewLifecycleOwner.lifecycleScope.launch {
             while (remainSeconds > 0) {
                 delay(1000)
                 remainSeconds--
-                binding.tvEmpty.text = "服务连接未就绪，30秒后自动重试（剩余 $remainSeconds 秒）\n可打开Shizuku关闭权限重新授权以跳过等待"
+                binding.tvEmpty.text = getString(R.string.result_retry, remainSeconds)
             }
             loadFileList()
         }
     }
 
-    // ========== 以下导入/导出逻辑保持不变 ==========
-// ========== 导入：Base64分块传输，无中转文件 ==========
     private fun startImport(uris: List<Uri>) {
-        Toast.makeText(requireContext(), "开始导入 ${uris.size} 个文件", Toast.LENGTH_SHORT).show()
-        lifecycleScope.launch {
-            var successCount = 0
+        Toast.makeText(requireContext(), getString(R.string.import_start, uris.size), Toast.LENGTH_SHORT).show()
+        viewLifecycleOwner.lifecycleScope.launch {
+        var successCount = 0
             // 确保目标目录存在
             ShellExecutor.exec("mkdir -p $currentPath")
 
@@ -208,103 +210,68 @@ class FileListFragment : Fragment() {
                 }
             }
 
-            Toast.makeText(requireContext(), "导入完成：成功 $successCount 个", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.import_complete, successCount), Toast.LENGTH_SHORT).show()
             loadFileList()
         }
     }
 
-    /**
-     * 单文件导入：Base64分块写入，无中转文件，兼容多用户隔离
-     */
     private suspend fun importSingleFile(uri: Uri, targetPath: String): Boolean {
         return withContext(Dispatchers.IO) {
             var inputStream: java.io.InputStream? = null
+            var outputStream: java.io.OutputStream? = null
             try {
+                // 从SAF读取外部文件
                 inputStream = requireContext().contentResolver.openInputStream(uri)
                     ?: return@withContext false
-                val buffer = ByteArray(TRANSFER_CHUNK_SIZE)
-                var isFirstChunk = true
-                var readLen: Int
-
-                while (inputStream.read(buffer).also { readLen = it } != -1) {
-                    // 截取实际读取的字节，转无换行Base64
-                    val chunk = buffer.copyOf(readLen)
-                    val base64Str = android.util.Base64.encodeToString(chunk, android.util.Base64.NO_WRAP)
-
-                    // 第一块覆盖写入，后续块追加写入
-                    val redirect = if (isFirstChunk) ">" else ">>"
-                    // 单引号包裹Base64串，避免Shell特殊字符解析问题
-                    val cmd = "printf '%s' '$base64Str' | base64 -d $redirect \"$targetPath\""
-                    val result = ShellExecutor.exec(cmd)
-
-                    if (!result.isSuccess) {
-                        return@withContext false
-                    }
-                    isFirstChunk = false
-                }
+                // 通过Shizuku获取目标文件的写入FD（覆盖模式）
+                val pfd = ShellExecutor.openFileWrite(targetPath, append = false)
+                    ?: return@withContext false
+                outputStream = ParcelFileDescriptor.AutoCloseOutputStream(pfd)
+                // 直接复制，使用8MB缓冲区提高效率
+                inputStream.copyTo(outputStream, bufferSize = 8 * 1024 * 1024)
                 true
             } catch (e: Exception) {
+                e.printStackTrace()
                 false
             } finally {
                 runCatching { inputStream?.close() }
+                runCatching { outputStream?.close() }
             }
         }
     }
 
-    // ========== 导出：Base64分块读取，无中转文件 ==========
     private fun startExport(fileItem: FileItem, targetUri: Uri) {
-        Toast.makeText(requireContext(), "正在导出：${fileItem.name}", Toast.LENGTH_SHORT).show()
-        lifecycleScope.launch {
-            val success = exportSingleFile(fileItem.path, targetUri)
+        Toast.makeText(requireContext(), getString(R.string.export_start, fileItem.name), Toast.LENGTH_SHORT).show()
+        viewLifecycleOwner.lifecycleScope.launch {
+        val success = exportSingleFile(fileItem.path, targetUri)
             Toast.makeText(
                 requireContext(),
-                if (success) "导出成功" else "导出失败",
+                if (success) R.string.export_success else R.string.export_failed,
                 Toast.LENGTH_SHORT
             ).show()
         }
     }
 
-    /**
-     * 单文件导出：dd按偏移分块 + Base64编码，无中转文件，兼容多用户隔离
-     */
     private suspend fun exportSingleFile(sourcePath: String, targetUri: Uri): Boolean {
         return withContext(Dispatchers.IO) {
+            var inputStream: java.io.InputStream? = null
             var outputStream: java.io.OutputStream? = null
             try {
+                // 通过Shizuku获取源文件的读取FD
+                val pfd = ShellExecutor.openFileRead(sourcePath)
+                    ?: return@withContext false
+                inputStream = ParcelFileDescriptor.AutoCloseInputStream(pfd)
+                // 通过SAF获取目标URI的输出流
                 outputStream = requireContext().contentResolver.openOutputStream(targetUri)
                     ?: return@withContext false
-                var offset = 0L
-
-                while (true) {
-                    // dd按字节偏移读取指定大小块，管道给base64编码，丢弃stderr避免统计信息干扰
-                    val cmd = "dd if=\"$sourcePath\" bs=1 count=$TRANSFER_CHUNK_SIZE skip=$offset 2>/dev/null | base64"
-                    val result = ShellExecutor.exec(cmd)
-
-                    if (!result.isSuccess || result.stdout.isBlank()) {
-                        break
-                    }
-
-                    // 去掉末尾换行，解码Base64
-                    val base64Str = result.stdout.trim()
-                    val chunk = try {
-                        android.util.Base64.decode(base64Str, android.util.Base64.DEFAULT)
-                    } catch (e: Exception) {
-                        return@withContext false
-                    }
-
-                    outputStream.write(chunk)
-                    offset += chunk.size
-
-                    // 读到文件末尾，退出循环
-                    if (chunk.size < TRANSFER_CHUNK_SIZE) {
-                        break
-                    }
-                }
+                // 直接复制
+                inputStream.copyTo(outputStream, bufferSize = 8 * 1024 * 1024)
                 true
             } catch (e: Exception) {
+                e.printStackTrace()
                 false
             } finally {
-                runCatching { outputStream?.flush() }
+                runCatching { inputStream?.close() }
                 runCatching { outputStream?.close() }
             }
         }
@@ -321,5 +288,37 @@ class FileListFragment : Fragment() {
             }
         }
         return name
+    }
+
+    /**
+     * 显示删除确认对话框
+     */
+    private fun showDeleteConfirmationDialog(fileItem: FileItem) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.delete_confirm_title)
+            .setMessage(getString(R.string.delete_confirm_message, fileItem.name))
+            .setPositiveButton(R.string.delete_positive) { _, _ -> performDelete(fileItem) }
+            .setNegativeButton(R.string.delete_negative, null)
+            .show()
+    }
+
+    /**
+     * 执行删除操作（通过 Shizuku）
+     */
+    private fun performDelete(fileItem: FileItem) {
+        lifecycleScope.launch {
+            val targetPath = fileItem.path
+            val cmd = if (fileItem.isDirectory) {
+                "rm -rf \"$targetPath\""
+            } else {
+                "rm \"$targetPath\""
+            }
+            val result = ShellExecutor.exec(cmd)
+            if (result.isSuccess) {
+                Toast.makeText(requireContext(), R.string.delete_success, Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(requireContext(), getString(R.string.delete_failed, result.stderr), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }
