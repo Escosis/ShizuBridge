@@ -16,7 +16,7 @@ Android 的多用户机制为每个用户提供了独立的数据空间。机主
 
 ## 原有的手动方案及其局限
 
-在开发 ShizuBridge 之前，我使用办法是利用 `/data/local/tmp` 作为中转：
+在开发 ShizuBridge 之前，我的办法是利用 `/data/local/tmp` 作为中转：
 
 1. 机主通过 MT 管理器（借助 Shizuku）将文件写入 `/data/local/tmp`，并执行 `chmod 777`。
 2. 其他用户通过 Mixplorer（同样借助 Shizuku）从 `/data/local/tmp` 读取文件。
