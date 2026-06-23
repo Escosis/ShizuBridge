@@ -46,8 +46,8 @@ Shizuku 服务默认运行在机主（User 0）的 `shell` 上下文中。当其
 
 ShizuBridge 不采用 Base64 分块或 Shell 命令拼接等低效方式，而是通过 Shizuku 的 `UserService` 在 `shell` 上下文中直接打开目标文件的 `ParcelFileDescriptor`，并将其通过 Binder 传递回应用进程：
 
-- **导出**（`/data/local/tmp` → 外部存储）：应用通过 Shizuku 获取源文件的只读 FD，通过 `ParcelFileDescriptor.AutoCloseInputStream` 读取数据，再通过 SAF（Storage Access Framework）写入用户指定的位置。
-- **导入**（外部存储 → `/data/local/tmp`）：应用通过 SAF 读取外部文件，通过 Shizuku 获取目标文件的写入 FD，直接进行流拷贝。
+- **导出**（`/data/local/tmp/ShizuBridge` → 外部存储）：应用通过 Shizuku 获取源文件的只读 FD，通过 `ParcelFileDescriptor.AutoCloseInputStream` 读取数据，再通过 SAF（Storage Access Framework）写入用户指定的位置。
+- **导入**（外部存储 → `/data/local/tmp/ShizuBridge`）：应用通过 SAF 读取外部文件，通过 Shizuku 获取目标文件的写入 FD，直接进行流拷贝。
 
 数据流在应用与内核之间直接传递，**无中转文件、无 Base64 编解码、无重复进程创建**，传输速度接近本地文件复制。
 
